@@ -2,7 +2,7 @@
 
 import sqlite3
 from contextlib import asynccontextmanager, closing
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import uvicorn
@@ -54,6 +54,15 @@ def parse_timestamp(value: str) -> str:
     return ts.strftime("%Y-%m-%d %H:%M:%S")
 
 
+def parse_date(value: str) -> str:
+    """Parse a 'YYYY-MM-DD' filter-range boundary. No future-date rejection."""
+    try:
+        datetime.strptime(value.strip(), "%Y-%m-%d")
+    except ValueError:
+        raise HTTPException(400, f"unparsable date {value!r}, expected YYYY-MM-DD")
+    return value.strip()
+
+
 class BrewIn(BaseModel):
     machine_id: int
     drink_type: str
@@ -71,8 +80,21 @@ class MaintenanceIn(BaseModel):
 
 
 @app.get("/api/stats")
-def stats(conn: sqlite3.Connection = Depends(get_db)):
-    return queries.get_stats(conn)
+def stats(
+    start: str | None = None,
+    end: str | None = None,
+    conn: sqlite3.Connection = Depends(get_db),
+):
+    start_parsed = parse_date(start) if start is not None else None
+    end_parsed = parse_date(end) if end is not None else None
+    if start_parsed is not None and end_parsed is not None and start_parsed > end_parsed:
+        raise HTTPException(400, "start must not be after end")
+    end_exclusive = None
+    if end_parsed is not None:
+        end_exclusive = (datetime.strptime(end_parsed, "%Y-%m-%d") + timedelta(days=1)).strftime(
+            "%Y-%m-%d"
+        )
+    return queries.get_stats(conn, start_parsed, end_exclusive)
 
 
 @app.get("/api/machines")
@@ -81,8 +103,22 @@ def machines(conn: sqlite3.Connection = Depends(get_db)):
 
 
 @app.get("/api/machines/{machine_id}")
-def machine_health(machine_id: int, conn: sqlite3.Connection = Depends(get_db)):
-    health = queries.get_machine_health(conn, machine_id)
+def machine_health(
+    machine_id: int,
+    start: str | None = None,
+    end: str | None = None,
+    conn: sqlite3.Connection = Depends(get_db),
+):
+    start_parsed = parse_date(start) if start is not None else None
+    end_parsed = parse_date(end) if end is not None else None
+    if start_parsed is not None and end_parsed is not None and start_parsed > end_parsed:
+        raise HTTPException(400, "start must not be after end")
+    end_exclusive = None
+    if end_parsed is not None:
+        end_exclusive = (datetime.strptime(end_parsed, "%Y-%m-%d") + timedelta(days=1)).strftime(
+            "%Y-%m-%d"
+        )
+    health = queries.get_machine_health(conn, machine_id, start_parsed, end_exclusive)
     if health is None:
         raise HTTPException(404, f"no machine with id {machine_id}")
     return health

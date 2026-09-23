@@ -15,6 +15,16 @@
   <main>
     <!-- Zone 1: dashboard -->
     <section id="dashboard">
+      <div class="panel filter-panel">
+        <label for="filter-start">From</label>
+        <input type="date" id="filter-start">
+        <label for="filter-end">To</label>
+        <input type="date" id="filter-end">
+        <button type="button" id="filter-apply">Apply</button>
+        <button type="button" id="filter-clear">Clear</button>
+        <p id="filter-message" class="message" role="status"></p>
+      </div>
+
       <div class="stat-tiles">
         <div class="tile">
           <span class="tile-number" id="total-brews">–</span>

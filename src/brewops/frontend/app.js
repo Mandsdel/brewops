@@ -11,6 +11,16 @@ async function fetchJSON(url, options) {
 
 // ---- dashboard ----
 
+function currentRange() {
+  const start = document.getElementById("filter-start").value; // "" or "YYYY-MM-DD"
+  const end = document.getElementById("filter-end").value;
+  const params = new URLSearchParams();
+  if (start) params.set("start", start);
+  if (end) params.set("end", end);
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
 function renderDrinkBars(perDrink) {
   const container = document.getElementById("drink-bars");
   container.innerHTML = "";
@@ -78,7 +88,8 @@ function renderMachineCards(healths) {
 }
 
 async function loadDashboard() {
-  const stats = await fetchJSON("/api/stats");
+  const range = currentRange();
+  const stats = await fetchJSON(`/api/stats${range}`);
   document.getElementById("total-brews").textContent = stats.total_brews;
   const lastDay = stats.per_day[stats.per_day.length - 1];
   document.getElementById("brews-today").textContent = lastDay ? lastDay.count : 0;
@@ -87,7 +98,9 @@ async function loadDashboard() {
 
   const machines = await fetchJSON("/api/machines");
   document.getElementById("machine-count").textContent = machines.length;
-  const healths = await Promise.all(machines.map((m) => fetchJSON(`/api/machines/${m.id}`)));
+  const healths = await Promise.all(
+    machines.map((m) => fetchJSON(`/api/machines/${m.id}${range}`))
+  );
   renderMachineCards(healths);
 }
 
@@ -107,6 +120,32 @@ function fillSelect(select, items, valueKey, labelKey) {
     option.textContent = item[labelKey];
     select.appendChild(option);
   }
+}
+
+function setupFilter() {
+  document.getElementById("filter-apply").addEventListener("click", () => {
+    const start = document.getElementById("filter-start").value;
+    const end = document.getElementById("filter-end").value;
+    const message = document.getElementById("filter-message");
+    message.textContent = "";
+    message.className = "message";
+    if (start && end && start > end) {
+      message.textContent = "From date must not be after To date.";
+      message.classList.add("error");
+      return;
+    }
+    loadDashboard().catch((error) => {
+      message.textContent = error.message;
+      message.classList.add("error");
+    });
+  });
+
+  document.getElementById("filter-clear").addEventListener("click", () => {
+    document.getElementById("filter-start").value = "";
+    document.getElementById("filter-end").value = "";
+    document.getElementById("filter-message").textContent = "";
+    loadDashboard().catch((error) => console.error("Dashboard failed to load:", error));
+  });
 }
 
 async function setupForms() {
@@ -161,3 +200,4 @@ loadDashboard().catch((error) => {
   console.error("Dashboard failed to load:", error);
 });
 setupForms().catch((error) => console.error("Form setup failed:", error));
+setupFilter();
