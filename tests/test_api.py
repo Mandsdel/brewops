@@ -45,6 +45,8 @@ def test_machines_list_and_health(db):
     assert r.status == 200
     health = r.json()
     assert health["brew_count"] == 2
+    assert health["specialty"]["name"] == "espresso"
+    assert health["specialty"]["count"] == 2
     assert health["last_maintenance"]["type"] == "descale"
 
 
